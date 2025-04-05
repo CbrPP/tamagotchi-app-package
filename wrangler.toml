@@ -1,0 +1,15 @@
+name = "tamagotchi-app-worker" # You might need to adjust this name
+compatibility_date = "2024-01-01" # Use a recent date
+
+# --- D1 Database Binding ---
+# This tells Wrangler that your code expects a D1 database named 'DB'.
+# You MUST replace 'YOUR_DATABASE_ID_HERE' with your actual D1 database ID
+# from the Cloudflare dashboard for the database features to work.
+[[d1_databases]]
+binding = "DB"                 # This is the name used in your code (cf.env.DB)
+database_name = "tamagotchi-db" # Choose a name for your database
+database_id = "YOUR_DATABASE_ID_HERE" # <<< REPLACE THIS with your actual D1 Database ID
+
+# --- Optional: Cloudflare Account ID ---
+# You might need to add your Cloudflare Account ID here
+# account_id = "YOUR_ACCOUNT_ID_HERE" # <<< REPLACE THIS if needed
