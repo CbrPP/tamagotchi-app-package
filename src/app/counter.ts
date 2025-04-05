@@ -1,12 +1,14 @@
 'use server'
-import { getCloudflareContext } from '@opennextjs/cloudflare'
+
+// import { getCloudflareContext } from '@opennextjs/cloudflare' // Removed for Vercel deployment
 import { headers } from 'next/headers'
 
 // 增加计数并记录访问
 export async function incrementAndLog() {
-  const cf = await getCloudflareContext()
+  // const cf = await getCloudflareContext() // Removed for Vercel deployment
   const headersList = await headers()
 
+  /* // Removed DB logic for Vercel deployment
   const { results: countResults } = await cf.env.DB.prepare(
     'INSERT INTO counters (name, value) VALUES (?, 1) ON CONFLICT (name) DO UPDATE SET value = value + 1 RETURNING value'
   )
@@ -21,16 +23,29 @@ export async function incrementAndLog() {
     .run()
 
   const { results: logs } = await cf.env.DB.prepare('SELECT * FROM access_logs ORDER BY accessed_at DESC LIMIT 5').all()
+  */
+
+  // Placeholder return value for Vercel
+  const placeholderCount = 0;
+  const placeholderLogs = [
+      { accessed_at: new Date().toISOString() },
+      { accessed_at: new Date().toISOString() }
+  ];
+
 
   return {
-    count: countResults[0].value,
-    recentAccess: logs
+    // count: countResults[0].value, // Original
+    // recentAccess: logs // Original
+    count: placeholderCount, // Placeholder
+    recentAccess: placeholderLogs // Placeholder
   } as { count: number; recentAccess: { accessed_at: string }[] }
 }
 
 // 获取当前计数和最近访问
 export async function getStats() {
-  const cf = await getCloudflareContext()
+  // const cf = await getCloudflareContext() // Removed for Vercel deployment
+
+  /* // Removed DB logic for Vercel deployment
   const { results: count } = await cf.env.DB.prepare('SELECT value FROM counters WHERE name = ?')
     .bind('page_views')
     .all()
@@ -38,9 +53,19 @@ export async function getStats() {
   const { results: logs } = await cf.env.DB.prepare(
     'SELECT accessed_at FROM access_logs ORDER BY accessed_at DESC LIMIT 5'
   ).all()
+  */
+
+  // Placeholder return value for Vercel
+  const placeholderCount = 0;
+  const placeholderLogs = [
+      { accessed_at: new Date().toISOString() },
+      { accessed_at: new Date().toISOString() }
+  ];
 
   return {
-    count: count[0]?.value || 0,
-    recentAccess: logs
+    // count: count[0]?.value || 0, // Original
+    // recentAccess: logs // Original
+    count: placeholderCount, // Placeholder
+    recentAccess: placeholderLogs // Placeholder
   } as { count: number; recentAccess: { accessed_at: string }[] }
 }
