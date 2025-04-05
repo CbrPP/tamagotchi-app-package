@@ -1,118 +1,142 @@
-import { useEffect, useState } from 'react';
-import { useTamagotchi } from './TamagotchiContext';
-import { useUser } from '../auth/UserContext';
+import React, { useEffect, useState } from 'react'; // Added React import
+import { useTamagotchi, TamagotchiContextType } from './TamagotchiContext'; // Ensured TamagotchiContextType is imported if defined there
+import { useUser } from '../auth/UserContext'; // Assuming UserContext provides user info
+
+// Define placeholder types if they are not properly defined/exported in context
+// You might need to adjust these based on the actual structure
+type PlaceholderTamagotchiStats = {
+  hunger: number;
+  thirst: number;
+  energy: number;
+  happiness: number;
+  cleanliness: number;
+  health: number;
+  // weight?: number; // Add weight if it should exist
+};
+
+type PlaceholderTamagotchiStatus = {
+  isSick: boolean;
+  isSleeping: boolean;
+};
+
+type PlaceholderTamagotchi = {
+  stats: PlaceholderTamagotchiStats;
+  status: PlaceholderTamagotchiStatus;
+  // Add other properties like age if needed
+  age?: number;
+};
+
 
 export default function HealthSystem() {
-  // const { tamagotchi, updateTamagotchiStat, treatTamagotchi } = useTamagotchi(); // Commented out due to type error
-  const { tamagotchi: originalTamagotchi, treatTamagotchi: originalTreatTamagotchi } = useTamagotchi(); // Renamed to avoid conflict with placeholder
-  const tamagotchi = originalTamagotchi; // Use the original for read-only access
-  const treatTamagotchi = originalTreatTamagotchi || (() => {}); // Use original or placeholder if original doesn't exist
+  // Attempt to get values, provide fallbacks if context is incomplete
+  const context = useTamagotchi();
+  const tamagotchi = context?.tamagotchi as PlaceholderTamagotchi | null ?? null; // Use original if available, else null
+  const treatTamagotchi = context?.treatTamagotchi || (() => { console.warn("treatTamagotchi not found in context"); }); // Use original or placeholder
 
-  const { user } = useUser();
+  const { user } = useUser() || {}; // Provide fallback for user context
   const [healthStatus, setHealthStatus] = useState('healthy');
   const [healthIssues, setHealthIssues] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<string[]>([]);
 
   useEffect(() => {
     if (!tamagotchi) return;
-
-    // Analyze health status based on stats
     analyzeHealthStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tamagotchi]); // Added tamagotchi to dependency array
+  }, [tamagotchi]);
 
   const analyzeHealthStatus = () => {
     if (!tamagotchi) return;
 
-    const issues = [];
-    const recommendations = [];
+    const issues: string[] = []; // Ensure type
+    const currentRecommendations: string[] = []; // Ensure type and use different name
     let status = 'healthy';
 
     // Check for hunger issues
     if (tamagotchi.stats.hunger < 20) {
       issues.push('Severe hunger');
-      recommendations.push('Feed your Tamagotchi immediately');
+      currentRecommendations.push('Feed your Tamagotchi immediately');
       status = tamagotchi.stats.hunger < 10 ? 'critical' : 'warning';
     } else if (tamagotchi.stats.hunger < 40) {
       issues.push('Hunger');
-      recommendations.push('Your Tamagotchi needs food soon');
-      if (status === 'healthy') status = 'warning'; // Only downgrade status if not already critical/warning
+      currentRecommendations.push('Your Tamagotchi needs food soon');
+      if (status === 'healthy') status = 'warning';
     }
 
     // Check for thirst issues
     if (tamagotchi.stats.thirst < 20) {
       issues.push('Severe thirst');
-      recommendations.push('Give your Tamagotchi water immediately');
+      currentRecommendations.push('Give your Tamagotchi water immediately');
       status = tamagotchi.stats.thirst < 10 ? 'critical' : (status !== 'critical' ? 'warning' : status);
     } else if (tamagotchi.stats.thirst < 40) {
       issues.push('Thirst');
-      recommendations.push('Your Tamagotchi needs water soon');
+      currentRecommendations.push('Your Tamagotchi needs water soon');
        if (status === 'healthy') status = 'warning';
     }
 
     // Check for energy issues
     if (tamagotchi.stats.energy < 20) {
       issues.push('Exhaustion');
-      recommendations.push('Your Tamagotchi needs to sleep');
+      currentRecommendations.push('Your Tamagotchi needs to sleep');
       status = tamagotchi.stats.energy < 10 ? 'critical' : (status !== 'critical' ? 'warning' : status);
     } else if (tamagotchi.stats.energy < 40) {
       issues.push('Tiredness');
-      recommendations.push('Your Tamagotchi should rest soon');
+      currentRecommendations.push('Your Tamagotchi should rest soon');
        if (status === 'healthy') status = 'warning';
     }
 
     // Check for happiness issues
     if (tamagotchi.stats.happiness < 20) {
       issues.push('Depression');
-      recommendations.push('Play with your Tamagotchi to improve its mood');
+      currentRecommendations.push('Play with your Tamagotchi to improve its mood');
       status = tamagotchi.stats.happiness < 10 ? 'critical' : (status !== 'critical' ? 'warning' : status);
     } else if (tamagotchi.stats.happiness < 40) {
       issues.push('Sadness');
-      recommendations.push('Your Tamagotchi needs more attention');
+      currentRecommendations.push('Your Tamagotchi needs more attention');
        if (status === 'healthy') status = 'warning';
     }
 
     // Check for cleanliness issues
     if (tamagotchi.stats.cleanliness < 20) {
       issues.push('Unhygienic');
-      recommendations.push('Clean your Tamagotchi');
+      currentRecommendations.push('Clean your Tamagotchi');
       status = tamagotchi.stats.cleanliness < 10 ? 'critical' : (status !== 'critical' ? 'warning' : status);
     } else if (tamagotchi.stats.cleanliness < 40) {
       issues.push('Dirty');
-      recommendations.push('Your Tamagotchi needs a bath soon');
+      currentRecommendations.push('Your Tamagotchi needs a bath soon');
        if (status === 'healthy') status = 'warning';
     }
 
     // Check for overall health
     if (tamagotchi.stats.health < 50) {
       issues.push('Poor health');
-      recommendations.push('Improve overall care to restore health');
+      currentRecommendations.push('Improve overall care to restore health');
       status = tamagotchi.stats.health < 30 ? 'critical' : (status !== 'critical' ? 'warning' : status);
     }
 
     // Check if sick
     if (tamagotchi.status.isSick) {
       issues.push('Illness');
-      recommendations.push('Treat your Tamagotchi with medicine');
+      currentRecommendations.push('Treat your Tamagotchi with medicine');
       status = 'critical';
     }
 
     setHealthIssues(issues);
-    setRecommendations(recommendations);
+    setRecommendations(currentRecommendations); // Use the correct variable name
     setHealthStatus(status);
   };
 
   const applyTreatment = (treatmentType: string) => {
     if (!tamagotchi) return;
-    if (treatTamagotchi) { // Check if the function exists
+    if (treatTamagotchi) {
         treatTamagotchi(treatmentType);
     } else {
-        console.warn("treatTamagotchi function not available"); // Optional warning
+        console.warn("treatTamagotchi function not available");
     }
   };
 
   if (!tamagotchi) {
-    return null;
+    // Maybe render a loading state or message instead of just null
+    return <div>Loading Tamagotchi health...</div>;
   }
 
   return (

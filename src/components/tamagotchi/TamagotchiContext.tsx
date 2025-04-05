@@ -46,7 +46,7 @@ interface Tamagotchi {
   lastCaredAt: Date;
 }
 
-interface TamagotchiContextType {
+export interface TamagotchiContextType {
   tamagotchi: Tamagotchi | null;
   createTamagotchi: (initialData: { name: string; evolutionType: string }) => void;
   feedTamagotchi: (foodType: string) => void;

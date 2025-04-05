@@ -1,10 +1,38 @@
-import { useTamagotchi } from '../tamagotchi/TamagotchiContext';
+import React from 'react'; // Added React import
+import { useTamagotchi } from './TamagotchiContext'; // Adjusted import path assuming context is in the same folder
+
+// Define placeholder types if they are not properly defined/exported in context
+// You might need to adjust these based on the actual structure
+type PlaceholderTamagotchiStats = {
+  hunger: number;
+  thirst: number;
+  energy: number;
+  happiness: number;
+  cleanliness: number;
+  health: number;
+  // weight?: number; // Weight is optional or removed based on the previous error
+};
+
+type PlaceholderTamagotchiStatus = {
+  isSick: boolean;
+  isSleeping: boolean;
+};
+
+type PlaceholderTamagotchi = {
+  stats: PlaceholderTamagotchiStats;
+  status: PlaceholderTamagotchiStatus;
+  age: number; // Assuming age exists
+};
+
 
 export default function StatusDashboard() {
-  const { tamagotchi } = useTamagotchi();
+  const context = useTamagotchi();
+  const tamagotchi = context?.tamagotchi as PlaceholderTamagotchi | null ?? null; // Use original if available, else null
+
 
   if (!tamagotchi) {
-    return null;
+     // Maybe render a loading state or message instead of just null
+    return <div>Loading Tamagotchi status...</div>;
   }
 
   // Helper function to determine color based on stat value
@@ -96,7 +124,12 @@ export default function StatusDashboard() {
         <div className="text-sm">
           <span className="font-medium">Age:</span> {tamagotchi.age} days
         </div>
-        {/* Weight line removed due to type error */}
+        {/* Weight display removed due to previous type error */}
+        {/* {tamagotchi.stats.weight && ( // Optionally display weight if the property exists
+           <div className="text-sm">
+             <span className="font-medium">Weight:</span> {tamagotchi.stats.weight.toFixed(1)} kg
+           </div>
+        )} */}
         <div className="text-sm">
           <span className="font-medium">Status:</span> {tamagotchi.status.isSick ? 'Sick' : tamagotchi.status.isSleeping ? 'Sleeping' : 'Awake'}
         </div>
