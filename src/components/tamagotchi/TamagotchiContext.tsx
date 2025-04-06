@@ -1,528 +1,287 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
 
-// Define types for our Tamagotchi
-interface TamagotchiStats {
+// Define the structure for Tamagotchi stats
+export interface TamagotchiStats {
   hunger: number;
   thirst: number;
   happiness: number;
   energy: number;
   health: number;
   cleanliness: number;
+  // weight?: number; // Weight seems to be missing based on previous errors
 }
 
-interface TamagotchiStatus {
+// Define the structure for Tamagotchi status
+export interface TamagotchiStatus {
   isSleeping: boolean;
   isSick: boolean;
-  isPlaying: boolean;
-  isEating: boolean;
+  poopCount: number;
 }
 
-interface TamagotchiDNA {
-  rarity: number;
-  traits: {
-    intelligence: number;
-    strength: number;
-    agility: number;
-  };
-}
-
-interface TamagotchiEvolution {
-  stage: number;
-  currentProgress: number;
-  maxProgress: number;
-}
-
-interface Tamagotchi {
+// Define the main Tamagotchi object structure
+export interface Tamagotchi {
   id: string;
   name: string;
   age: number;
-  evolutionType: string;
   stats: TamagotchiStats;
   status: TamagotchiStatus;
-  dna: TamagotchiDNA;
-  evolution: TamagotchiEvolution;
-  lastCaredAt: Date;
+  evolutionStage: string;
+  appearance?: {
+    imageUrl?: string;
+  };
+  dna?: {              // <<< Added optional dna property
+    traits?: {         // <<< Added optional traits property
+      intelligence?: number; // <<< Added optional intelligence property
+      // Add other potential DNA traits here
+    };
+    // Add other potential DNA properties here
+  };
+  lastUpdated: number; // Timestamp of the last update
 }
 
+// Define the shape of the context data and functions
+// Ensure this type includes everything provided by the context value below
 export interface TamagotchiContextType {
   tamagotchi: Tamagotchi | null;
-  createTamagotchi: (initialData: { name: string; evolutionType: string }) => void;
-  feedTamagotchi: (foodType: string) => void;
-  giveDrink: () => void;
-  playWithTamagotchi: (gameType: string) => void;
-  takeTamagotchiForWalk: (duration: number) => void;
-  putTamagotchiToSleep: () => void;
-  wakeTamagotchiUp: () => void;
+  loading: boolean;
+  feedTamagotchi: () => void;
+  giveWater: () => void;
+  playWithTamagotchi: () => void;
+  toggleSleep: () => void;
   cleanTamagotchi: () => void;
   treatTamagotchi: (treatmentType: string) => void;
-  updateTamagotchiBasedOnActivity: (activityType: string, duration: number) => void;
+  // updateTamagotchiStat?: (stat: keyof TamagotchiStats, value: number) => void; // Example of potentially missing function
+  saveTamagotchi: () => void;
 }
 
+// Create the context with a default value
 const TamagotchiContext = createContext<TamagotchiContextType | undefined>(undefined);
 
-export function TamagotchiProvider({ children }: { children: ReactNode }) {
-  const [tamagotchi, setTamagotchi] = useState<Tamagotchi | null>(null);
+// Define the Provider component props
+interface TamagotchiProviderProps {
+  children: ReactNode;
+}
 
-  // Initialize from localStorage if available
+// Initial state function (can load from localStorage or API later)
+const getInitialTamagotchi = (): Tamagotchi | null => {
+  // In a real app, load from localStorage or fetch from API
+  // For now, provide a default starting state if nothing is loaded
+  const defaultStats: TamagotchiStats = { hunger: 70, thirst: 70, happiness: 60, energy: 80, health: 90, cleanliness: 80 };
+  const defaultStatus: TamagotchiStatus = { isSleeping: false, isSick: false, poopCount: 0 };
+  // Add placeholder DNA if needed for initial state
+  const defaultDna = { traits: { intelligence: 5 } }; // Example intelligence trait value
+
+  return {
+    id: 'my-tamagotchi-1', // Example ID
+    name: 'Tamatest',
+    age: 0,
+    stats: defaultStats,
+    status: defaultStatus,
+    dna: defaultDna, // Include initial DNA if applicable
+    evolutionStage: 'egg',
+    appearance: { imageUrl: '/tamagotchi-egg.png' }, // Default appearance
+    lastUpdated: Date.now()
+  };
+};
+
+export const TamagotchiProvider: React.FC<TamagotchiProviderProps> = ({ children }) => {
+  const [tamagotchi, setTamagotchi] = useState<Tamagotchi | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Load initial state
   useEffect(() => {
-    const savedTamagotchi = localStorage.getItem('tamagotchi');
-    if (savedTamagotchi) {
-      try {
-        const parsedTamagotchi = JSON.parse(savedTamagotchi);
-        // Convert string date back to Date object
-        parsedTamagotchi.lastCaredAt = new Date(parsedTamagotchi.lastCaredAt);
-        setTamagotchi(parsedTamagotchi);
-      } catch (error) {
-        console.error('Error parsing saved Tamagotchi:', error);
-      }
-    }
+    // Simulate loading
+    const loadedTamagotchi = getInitialTamagotchi(); // Replace with actual loading logic
+    setTamagotchi(loadedTamagotchi);
+    setLoading(false);
   }, []);
 
-  // Save to localStorage whenever tamagotchi changes
-  useEffect(() => {
-    if (tamagotchi) {
-      localStorage.setItem('tamagotchi', JSON.stringify(tamagotchi));
-    }
-  }, [tamagotchi]);
 
-  // Passive stat changes over time
+  // Function to update stats, ensuring they stay within bounds (0-100)
+  const updateStat = useCallback((stat: keyof TamagotchiStats, change: number) => {
+    setTamagotchi(prev => {
+      if (!prev) return null;
+      // Ensure stats object exists before accessing property
+      const currentStatValue = prev.stats?.[stat] ?? 0;
+      const newValue = Math.max(0, Math.min(100, currentStatValue + change));
+      return {
+        ...prev,
+        stats: { ...(prev.stats ?? {}), [stat]: newValue } as TamagotchiStats, // Ensure type after update
+        lastUpdated: Date.now()
+      };
+    });
+  }, []);
+
+   // Function to update status
+   const updateStatus = useCallback((key: keyof TamagotchiStatus, value: any) => {
+    setTamagotchi(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        status: { ...(prev.status ?? {}), [key]: value } as TamagotchiStatus, // Ensure type after update
+        lastUpdated: Date.now()
+      };
+    });
+  }, []);
+
+
+  // Define actions
+  const feedTamagotchi = () => updateStat('hunger', 20);
+  const giveWater = () => updateStat('thirst', 20);
+  const playWithTamagotchi = () => updateStat('happiness', 15);
+  const cleanTamagotchi = () => {
+      updateStat('cleanliness', 30);
+      updateStatus('poopCount', 0); // Reset poop count when cleaned
+  };
+
+  const toggleSleep = () => {
+     setTamagotchi(prev => {
+      if (!prev) return null;
+      const sleeping = !prev.status?.isSleeping;
+      // Restore some energy when waking up, lose some when going sleep
+      const energyChange = sleeping ? -5 : 30;
+      const currentEnergy = prev.stats?.energy ?? 0;
+      const newEnergy = Math.max(0, Math.min(100, currentEnergy + energyChange));
+      return {
+        ...prev,
+        stats: { ...(prev.stats ?? {}), energy: newEnergy } as TamagotchiStats,
+        status: { ...(prev.status ?? {}), isSleeping: sleeping } as TamagotchiStatus,
+        lastUpdated: Date.now()
+      };
+    });
+  }
+
+  const treatTamagotchi = (treatmentType: string) => {
+    if (treatmentType === 'Medicine') {
+      updateStat('health', 25);
+      updateStatus('isSick', false); // Cure sickness
+    } else if (treatmentType === 'Rest') {
+       updateStat('energy', 15); // Give a small energy boost for forced rest
+       // Maybe temporarily set isSleeping to true if appropriate
+    }
+    // Add other treatments if needed
+  };
+
+
+  // Game loop effect for stat decay, aging, etc.
   useEffect(() => {
-    if (!tamagotchi) return;
+    if (!tamagotchi || tamagotchi.status?.isSleeping || loading) return; // Pause updates if sleeping or loading
 
     const interval = setInterval(() => {
       setTamagotchi(prev => {
-        if (!prev) return null;
+        if (!prev || prev.status?.isSleeping) return prev;
 
-        // Calculate time since last care
-        const now = new Date();
-        const timeDiff = (now.getTime() - prev.lastCaredAt.getTime()) / (1000 * 60); // in minutes
+        const now = Date.now();
+         // Prevent huge jumps if browser tab was inactive for a long time
+        const elapsedMs = Math.min(now - prev.lastUpdated, 2 * 60 * 1000); // Cap elapsed time to 2 minutes
+        const elapsedHours = elapsedMs / (1000 * 60 * 60);
 
-        // Decrease stats based on time passed
-        const newHunger = Math.max(0, prev.stats.hunger - timeDiff * 0.2);
-        const newThirst = Math.max(0, prev.stats.thirst - timeDiff * 0.3);
-        const newEnergy = prev.status.isSleeping 
-          ? Math.min(100, prev.stats.energy + timeDiff * 0.5) 
-          : Math.max(0, prev.stats.energy - timeDiff * 0.1);
-        const newHappiness = Math.max(0, prev.stats.happiness - timeDiff * 0.1);
-        const newCleanliness = Math.max(0, prev.stats.cleanliness - timeDiff * 0.1);
+        if (elapsedHours <= 0) return prev; // No update needed if no time passed
 
-        // Health decreases if other stats are low
-        let healthChange = 0;
-        if (newHunger < 20 || newThirst < 20) healthChange -= 0.2;
-        if (newEnergy < 20) healthChange -= 0.1;
-        if (newCleanliness < 30) healthChange -= 0.1;
-        
-        const newHealth = Math.max(0, Math.min(100, prev.stats.health + healthChange));
+        // Safely access previous stats and status, providing defaults
+        const prevStats = prev.stats ?? { hunger: 50, thirst: 50, happiness: 50, energy: 50, health: 100, cleanliness: 50 };
+        const prevStatus = prev.status ?? { isSleeping: false, isSick: false, poopCount: 0 };
 
-        // Check if Tamagotchi becomes sick
-        const becomesSick = newHealth < 30 && Math.random() < 0.2;
+        // Decay stats gradually (adjust rates as needed)
+        const hungerDecay = 1 * elapsedHours;
+        const thirstDecay = 1.5 * elapsedHours;
+        const happinessDecay = 0.5 * elapsedHours;
+        const energyDecay = 0.8 * elapsedHours;
+        const cleanlinessDecay = 0.4 * elapsedHours;
+        // Health decay could be linked to low stats or sickness
+        let healthDecay = 0;
+        if (prevStats.hunger < 15 || prevStats.thirst < 15) healthDecay += 1 * elapsedHours;
+        if (prevStatus.isSick) healthDecay += 2 * elapsedHours;
 
-        // Increase age slightly (1 day = 24 real minutes in this simulation)
-        const ageIncrease = timeDiff / (24 * 60) * 1; // Convert minutes to days
-        const newAge = prev.age + ageIncrease;
 
-        // Update evolution progress based on care quality
-        const careQuality = (newHunger + newThirst + newHappiness + newHealth + newCleanliness) / 500;
-        const evolutionProgress = Math.min(
-          prev.evolution.maxProgress,
-          prev.evolution.currentProgress + careQuality * 0.5
-        );
+        // Calculate new stats
+        const newStats: TamagotchiStats = {
+          hunger: Math.max(0, prevStats.hunger - hungerDecay),
+          thirst: Math.max(0, prevStats.thirst - thirstDecay),
+          happiness: Math.max(0, prevStats.happiness - happinessDecay),
+          energy: Math.max(0, prevStats.energy - energyDecay),
+          health: Math.max(0, prevStats.health - healthDecay),
+          cleanliness: Math.max(0, prevStats.cleanliness - cleanlinessDecay),
+        };
+
+         // Handle poop generation (less frequent)
+         let newPoopCount = prevStatus.poopCount;
+         if (Math.random() < 0.05 * elapsedHours && newPoopCount < 3) { // Chance to poop, max 3
+            newPoopCount += 1;
+         }
+
+         // Handle getting sick (chance increases with low cleanliness/health)
+         let newIsSick = prevStatus.isSick;
+         if (!newIsSick && (prevStats.cleanliness < 25 || prevStats.health < 40)) {
+             if (Math.random() < 0.02 * elapsedHours) { // Chance to get sick
+                 newIsSick = true;
+             }
+         }
+
+        // Calculate age increment (ensure age is a number)
+        const currentAge = typeof prev.age === 'number' ? prev.age : 0;
+        const newAge = currentAge + (elapsedHours / 24); // Rough age increment
 
         return {
           ...prev,
+          stats: newStats,
+          status: { ...prevStatus, poopCount: newPoopCount, isSick: newIsSick },
+          lastUpdated: now,
           age: newAge,
-          stats: {
-            hunger: newHunger,
-            thirst: newThirst,
-            happiness: newHappiness,
-            energy: newEnergy,
-            health: newHealth,
-            cleanliness: newCleanliness
-          },
-          status: {
-            ...prev.status,
-            isSick: prev.status.isSick || becomesSick
-          },
-          evolution: {
-            ...prev.evolution,
-            currentProgress: evolutionProgress
-          },
-          lastCaredAt: now
         };
       });
-    }, 60000); // Update every minute
+    }, 60 * 1000); // Update every minute
 
-    return () => clearInterval(interval);
-  }, [tamagotchi]);
+    return () => clearInterval(interval); // Cleanup interval on component unmount
+  }, [tamagotchi, loading]); // Rerun effect if tamagotchi or loading state changes
 
-  // Create a new Tamagotchi
-  const createTamagotchi = (initialData: { name: string; evolutionType: string }) => {
-    const newTamagotchi: Tamagotchi = {
-      id: `tamagotchi-${Date.now()}`,
-      name: initialData.name,
-      age: 0,
-      evolutionType: initialData.evolutionType,
-      stats: {
-        hunger: 80,
-        thirst: 80,
-        happiness: 80,
-        energy: 80,
-        health: 80,
-        cleanliness: 80
-      },
-      status: {
-        isSleeping: false,
-        isSick: false,
-        isPlaying: false,
-        isEating: false
-      },
-      dna: {
-        rarity: 1 + Math.floor(Math.random() * 3), // Initial rarity 1-3
-        traits: {
-          intelligence: 0.3 + Math.random() * 0.4, // 0.3-0.7
-          strength: 0.3 + Math.random() * 0.4,
-          agility: 0.3 + Math.random() * 0.4
+
+   // Save function (example - could save to localStorage or API)
+   const saveTamagotchi = () => {
+      if (tamagotchi) {
+         console.log("Saving Tamagotchi state:", tamagotchi);
+         // Implement actual saving logic here (e.g., localStorage.setItem)
+         if (typeof window !== 'undefined') { // Ensure localStorage is available
+            localStorage.setItem('tamagotchiState', JSON.stringify(tamagotchi));
+         }
+      }
+   };
+
+    // Load state from localStorage on initial mount (client-side only)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const savedState = localStorage.getItem('tamagotchiState');
+            if (savedState) {
+                try {
+                    const parsedState = JSON.parse(savedState);
+                    // Add validation here if needed before setting state
+                    setTamagotchi(parsedState);
+                } catch (e) {
+                    console.error("Failed to load state from localStorage", e);
+                    setTamagotchi(getInitialTamagotchi()); // Fallback to initial
+                }
+            } else {
+                 setTamagotchi(getInitialTamagotchi()); // Set initial if nothing saved
+            }
+            setLoading(false);
         }
-      },
-      evolution: {
-        stage: 0,
-        currentProgress: 0,
-        maxProgress: 100
-      },
-      lastCaredAt: new Date()
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Empty dependency array means this runs once on mount
 
-    setTamagotchi(newTamagotchi);
-  };
 
-  // Feed the Tamagotchi
-  const feedTamagotchi = (foodType: string) => {
-    if (!tamagotchi) return;
-
-    setTamagotchi(prev => {
-      if (!prev) return null;
-
-      // Different foods have different effects
-      let hungerIncrease = 20;
-      let healthChange = 0;
-      let happinessChange = 5;
-      let strengthChange = 0;
-
-      if (foodType === 'Fresh Apple') {
-        hungerIncrease = 15;
-        healthChange = 5;
-      } else if (foodType === 'Protein Shake') {
-        hungerIncrease = 25;
-        strengthChange = 0.1;
-      } else if (foodType === 'Sweet Cake') {
-        hungerIncrease = 10;
-        happinessChange = 15;
-        healthChange = -2; // Unhealthy food
-      }
-
-      return {
-        ...prev,
-        stats: {
-          ...prev.stats,
-          hunger: Math.min(100, prev.stats.hunger + hungerIncrease),
-          health: Math.min(100, prev.stats.health + healthChange),
-          happiness: Math.min(100, prev.stats.happiness + happinessChange)
-        },
-        status: {
-          ...prev.status,
-          isEating: true
-        },
-        dna: {
-          ...prev.dna,
-          traits: {
-            ...prev.dna.traits,
-            strength: Math.min(1, prev.dna.traits.strength + strengthChange)
-          }
-        },
-        lastCaredAt: new Date()
-      };
-    });
-
-    // Reset eating status after a delay
-    setTimeout(() => {
-      setTamagotchi(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          status: {
-            ...prev.status,
-            isEating: false
-          }
-        };
-      });
-    }, 3000);
-  };
-
-  // Give water to the Tamagotchi
-  const giveDrink = () => {
-    if (!tamagotchi) return;
-
-    setTamagotchi(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        stats: {
-          ...prev.stats,
-          thirst: Math.min(100, prev.stats.thirst + 30)
-        },
-        lastCaredAt: new Date()
-      };
-    });
-  };
-
-  // Play with the Tamagotchi
-  const playWithTamagotchi = (gameType: string) => {
-    if (!tamagotchi) return;
-
-    setTamagotchi(prev => {
-      if (!prev) return null;
-
-      // Different games have different effects
-      let happinessIncrease = 20;
-      let energyDecrease = 10;
-      let intelligenceChange = 0;
-      let agilityChange = 0;
-
-      if (gameType === 'Ball Game') {
-        happinessIncrease = 20;
-        energyDecrease = 10;
-        agilityChange = 0.1;
-      } else if (gameType === 'Puzzle Game') {
-        happinessIncrease = 15;
-        energyDecrease = 5;
-        intelligenceChange = 0.1;
-      }
-
-      return {
-        ...prev,
-        stats: {
-          ...prev.stats,
-          happiness: Math.min(100, prev.stats.happiness + happinessIncrease),
-          energy: Math.max(0, prev.stats.energy - energyDecrease)
-        },
-        status: {
-          ...prev.status,
-          isPlaying: true
-        },
-        dna: {
-          ...prev.dna,
-          traits: {
-            ...prev.dna.traits,
-            intelligence: Math.min(1, prev.dna.traits.intelligence + intelligenceChange),
-            agility: Math.min(1, prev.dna.traits.agility + agilityChange)
-          }
-        },
-        lastCaredAt: new Date()
-      };
-    });
-
-    // Reset playing status after a delay
-    setTimeout(() => {
-      setTamagotchi(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          status: {
-            ...prev.status,
-            isPlaying: false
-          }
-        };
-      });
-    }, 3000);
-  };
-
-  // Take the Tamagotchi for a walk
-  const takeTamagotchiForWalk = (duration: number) => {
-    if (!tamagotchi) return;
-
-    setTamagotchi(prev => {
-      if (!prev) return null;
-
-      // Effects scale with duration
-      const happinessIncrease = duration * 0.5;
-      const energyDecrease = duration * 0.3;
-      const healthIncrease = duration * 0.1;
-      const agilityChange = duration * 0.005;
-
-      return {
-        ...prev,
-        stats: {
-          ...prev.stats,
-          happiness: Math.min(100, prev.stats.happiness + happinessIncrease),
-          energy: Math.max(0, prev.stats.energy - energyDecrease),
-          health: Math.min(100, prev.stats.health + healthIncrease)
-        },
-        dna: {
-          ...prev.dna,
-          traits: {
-            ...prev.dna.traits,
-            agility: Math.min(1, prev.dna.traits.agility + agilityChange)
-          }
-        },
-        lastCaredAt: new Date()
-      };
-    });
-  };
-
-  // Put the Tamagotchi to sleep
-  const putTamagotchiToSleep = () => {
-    if (!tamagotchi) return;
-
-    setTamagotchi(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        status: {
-          ...prev.status,
-          isSleeping: true
-        },
-        lastCaredAt: new Date()
-      };
-    });
-  };
-
-  // Wake up the Tamagotchi
-  const wakeTamagotchiUp = () => {
-    if (!tamagotchi) return;
-
-    setTamagotchi(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        status: {
-          ...prev.status,
-          isSleeping: false
-        },
-        lastCaredAt: new Date()
-      };
-    });
-  };
-
-  // Clean the Tamagotchi
-  const cleanTamagotchi = () => {
-    if (!tamagotchi) return;
-
-    setTamagotchi(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        stats: {
-          ...prev.stats,
-          cleanliness: 100,
-          happiness: Math.min(100, prev.stats.happiness + 10)
-        },
-        lastCaredAt: new Date()
-      };
-    });
-  };
-
-  // Treat the Tamagotchi when sick
-  const treatTamagotchi = (treatmentType: string) => {
-    if (!tamagotchi) return;
-
-    setTamagotchi(prev => {
-      if (!prev) return null;
-
-      let healthIncrease = 0;
-      let curesSickness = false;
-
-      if (treatmentType === 'Medicine') {
-        healthIncrease = 30;
-        curesSickness = true;
-      } else if (treatmentType === 'Rest') {
-        healthIncrease = 15;
-        curesSickness = prev.stats.health + 15 > 70; // Only cures if health will be above 70
-      }
-
-      return {
-        ...prev,
-        stats: {
-          ...prev.stats,
-          health: Math.min(100, prev.stats.health + healthIncrease)
-        },
-        status: {
-          ...prev.status,
-          isSick: !curesSickness && prev.status.isSick
-        },
-        lastCaredAt: new Date()
-      };
-    });
-  };
-
-  // Update Tamagotchi based on user's real-life activity
-  const updateTamagotchiBasedOnActivity = (activityType: string, duration: number) => {
-    if (!tamagotchi) return;
-
-    setTamagotchi(prev => {
-      if (!prev) return null;
-
-      let healthChange = 0;
-      let happinessChange = 0;
-      let energyChange = 0;
-      let strengthChange = 0;
-      let agilityChange = 0;
-
-      if (activityType === 'walking') {
-        healthChange = duration * 0.1;
-        happinessChange = duration * 0.05;
-        energyChange = -duration * 0.05;
-        agilityChange = duration * 0.001;
-      } else if (activityType === 'running') {
-        healthChange = duration * 0.2;
-        happinessChange = duration * 0.1;
-        energyChange = -duration * 0.15;
-        strengthChange = duration * 0.001;
-        agilityChange = duration * 0.002;
-      } else if (activityType === 'cycling') {
-        healthChange = duration * 0.15;
-        happinessChange = duration * 0.1;
-        energyChange = -duration * 0.1;
-        strengthChange = duration * 0.002;
-        agilityChange = duration * 0.001;
-      } else if (activityType === 'stationary') {
-        energyChange = duration * 0.05;
-      }
-
-      return {
-        ...prev,
-        stats: {
-          ...prev.stats,
-          health: Math.min(100, prev.stats.health + healthChange),
-          happiness: Math.min(100, prev.stats.happiness + happinessChange),
-          energy: Math.max(0, Math.min(100, prev.stats.energy + energyChange))
-        },
-        dna: {
-          ...prev.dna,
-          traits: {
-            ...prev.dna.traits,
-            strength: Math.min(1, prev.dna.traits.strength + strengthChange),
-            agility: Math.min(1, prev.dna.traits.agility + agilityChange)
-          }
-        },
-        lastCaredAt: new Date()
-      };
-    });
-  };
-
+  // Provide context value
   const contextValue: TamagotchiContextType = {
     tamagotchi,
-    createTamagotchi,
+    loading,
     feedTamagotchi,
-    giveDrink,
+    giveWater,
     playWithTamagotchi,
-    takeTamagotchiForWalk,
-    putTamagotchiToSleep,
-    wakeTamagotchiUp,
+    toggleSleep,
     cleanTamagotchi,
     treatTamagotchi,
-    updateTamagotchiBasedOnActivity
+    saveTamagotchi
   };
 
   return (
@@ -530,12 +289,15 @@ export function TamagotchiProvider({ children }: { children: ReactNode }) {
       {children}
     </TamagotchiContext.Provider>
   );
-}
+};
 
-export function useTamagotchi() {
+// Custom hook to use the Tamagotchi context
+export const useTamagotchi = (): TamagotchiContextType => {
   const context = useContext(TamagotchiContext);
   if (context === undefined) {
+    // This error is expected if the hook is used outside the provider
+    // It might indicate a component structure issue if it happens unexpectedly
     throw new Error('useTamagotchi must be used within a TamagotchiProvider');
   }
   return context;
-}
+};
