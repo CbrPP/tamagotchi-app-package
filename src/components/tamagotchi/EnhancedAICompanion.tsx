@@ -1,415 +1,216 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Use useCallback
 import { useTamagotchi } from './TamagotchiContext';
+// --- ADDED UI IMPORTS ---
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { SendHorizontal, Mic, Camera } from 'lucide-react'; // Import icons
+// ------------------------
+
+// Define a type for personality traits
+interface Personality {
+  friendliness: number;
+  playfulness: number;
+  intelligence: number;
+  sassiness: number;
+}
+
+// Define message structure
+interface Message {
+  role: 'user' | 'tamagotchi';
+  content: string;
+  timestamp: Date;
+}
 
 export default function EnhancedAICompanion() {
-  const { tamagotchi } = useTamagotchi();
-  const [messages, setMessages] = useState<Array<{role: 'user' | 'tamagotchi', content: string, timestamp: Date}>>([]);
+  const { tamagotchi } = useTamagotchi() || {};
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [personalityTraits, setPersonalityTraits] = useState({
-    friendliness: 0.7,
-    playfulness: 0.6,
-    intelligence: 0.5,
-    sassiness: 0.3
+  const [personalityTraits, setPersonalityTraits] = useState<Personality>({
+    friendliness: 0.7, playfulness: 0.6, intelligence: 0.5, sassiness: 0.3
   });
 
   // Initialize with a welcome message
   useEffect(() => {
     if (tamagotchi && messages.length === 0) {
-      const welcomeMessage = {
-        role: 'tamagotchi' as const,
-        content: `Hi there! I'm ${tamagotchi.name}. How can I help you today?`,
-        timestamp: new Date()
-      };
+      const welcomeMessage: Message = { role: 'tamagotchi', content: `Hi there! I'm ${tamagotchi.name ?? 'your companion'}. How can I help you today?`, timestamp: new Date() };
       setMessages([welcomeMessage]);
     }
   }, [tamagotchi, messages.length]);
 
   // Evolve personality based on interactions
   useEffect(() => {
-    if (!tamagotchi) return;
-    
-    // In a real app, this would be more sophisticated and persistent
+    if (!tamagotchi?.stats) return;
     const interval = setInterval(() => {
       setPersonalityTraits(prev => {
-        // Personality evolves based on tamagotchi stats and care
-        const intelligenceBoost = tamagotchi.dna.traits.intelligence * 0.1;
-        const friendlinessBoost = tamagotchi.stats.happiness > 70 ? 0.05 : -0.05;
-        const playfulnessBoost = tamagotchi.stats.energy > 60 ? 0.03 : -0.03;
-        const sassinessBoost = tamagotchi.stats.hunger < 40 ? 0.07 : -0.02;
-        
+        const intelTrait = tamagotchi.dna?.traits?.intelligence ?? 0.5; // Default to 0.5 if missing
+        const happiness = tamagotchi.stats?.happiness ?? 50;
+        const energy = tamagotchi.stats?.energy ?? 50;
+        const hunger = tamagotchi.stats?.hunger ?? 50;
+        const intelligenceBoost = intelTrait * 0.05;
+        const friendlinessBoost = happiness > 70 ? 0.03 : -0.03;
+        const playfulnessBoost = energy > 60 ? 0.02 : -0.02;
+        const sassinessBoost = hunger < 40 ? 0.04 : -0.01;
         return {
-          intelligence: Math.min(1, Math.max(0.1, prev.intelligence + intelligenceBoost)),
-          friendliness: Math.min(1, Math.max(0.1, prev.friendliness + friendlinessBoost)),
-          playfulness: Math.min(1, Math.max(0.1, prev.playfulness + playfulnessBoost)),
-          sassiness: Math.min(1, Math.max(0.1, prev.sassiness + sassinessBoost))
+          intelligence: Math.min(1, Math.max(0.1, (prev.intelligence || 0.5) + intelligenceBoost)),
+          friendliness: Math.min(1, Math.max(0.1, (prev.friendliness || 0.5) + friendlinessBoost)),
+          playfulness: Math.min(1, Math.max(0.1, (prev.playfulness || 0.5) + playfulnessBoost)),
+          sassiness: Math.min(1, Math.max(0.1, (prev.sassiness || 0.2) + sassinessBoost))
         };
       });
-    }, 60000); // Update every minute
-    
+    }, 60000);
     return () => clearInterval(interval);
-  }, [tamagotchi]);
+  }, [tamagotchi?.stats, tamagotchi?.dna]); // Safe dependencies
 
-  const handleSendMessage = () => {
+  // Generate AI Response Logic (wrapped in useCallback)
+  const generateResponse = useCallback((userInput: string) => {
+    if (!tamagotchi?.stats || !tamagotchi?.status) return;
+
+    const lowerInput = userInput.toLowerCase();
+    let response = '';
+    const stats = tamagotchi.stats;
+    const status = tamagotchi.status;
+    const evolutionStageValue = tamagotchi?.evolution?.stage;
+    let evolutionStageNumber = 0;
+    if (typeof evolutionStageValue === 'number') { evolutionStageNumber = evolutionStageValue; }
+    else if (typeof evolutionStageValue === 'string') { evolutionStageNumber = parseInt(evolutionStageValue, 10) || 0; }
+    const isEligibleForBreeding = (tamagotchi.age ?? 0) >= 15 && (stats.health ?? 0) >= 70 && !(status.isSick ?? true) && evolutionStageNumber >= 2;
+
+    // Simplified response logic
+    if (lowerInput.includes('hello') || lowerInput.includes('hi')) { response = `Hi there! Feeling about ${stats.happiness ?? 50}% happy right now.`; }
+    else if (lowerInput.includes('how are you')) { response = `Doing okay! Energy: ${stats.energy ?? '?'}, Health: ${stats.health ?? '?'}.`; if (status.isSick) response += " Feeling sick though."; }
+    else if (lowerInput.includes('evolution')) { response = `I'm a ${tamagotchi.evolutionStage ?? 'creature'} (Stage ${evolutionStageNumber}).`; }
+    else if (lowerInput.includes('breed')) { response = isEligibleForBreeding ? `Ready to breed!` : `Not ready for breeding yet (Stage ${evolutionStageNumber}/2 needed).`; }
+    else if (lowerInput.includes('advice')) { response = "Remember to take breaks!"; }
+    else if (lowerInput.includes('love')) { response = `Aww, thanks! ❤️`; }
+    else { response = "Interesting point!"; }
+
+    // Personality injection
+    if (personalityTraits.sassiness > 0.7 && Math.random() < 0.2) response += " Pfft.";
+    if (personalityTraits.friendliness > 0.8 && Math.random() < 0.3) response += " 😊";
+    if (personalityTraits.playfulness > 0.7 && Math.random() < 0.2) response += " Let's play!";
+
+    const tamagotchiMessage: Message = { role: 'tamagotchi', content: response, timestamp: new Date() };
+    setMessages(prev => [...prev, tamagotchiMessage]);
+  }, [tamagotchi, personalityTraits]); // Added personalityTraits dependency
+
+
+  const handleSendMessage = useCallback(() => { // Wrap in useCallback
     if (!inputMessage.trim() || !tamagotchi) return;
-    
-    // Add user message
-    const userMessage = {
-      role: 'user' as const,
-      content: inputMessage,
-      timestamp: new Date()
-    };
-    
+    const userMessage: Message = { role: 'user', content: inputMessage, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsProcessing(true);
-    
-    // Simulate AI processing
-    setTimeout(() => {
-      generateResponse(inputMessage);
-      setIsProcessing(false);
-    }, 1000);
-  };
+    setTimeout(() => { generateResponse(inputMessage); setIsProcessing(false); }, 1000);
+  }, [inputMessage, tamagotchi, generateResponse]); // Add dependencies
 
-  const generateResponse = (userInput: string) => {
-    if (!tamagotchi) return;
-    
-    // In a real app, this would use a proper AI model
-    // This is a simplified simulation
-    
-    // Detect intent from user input
-    const lowerInput = userInput.toLowerCase();
-    let response = '';
-    
-    // Check for greetings
-    if (lowerInput.includes('hello') || lowerInput.includes('hi') || lowerInput.includes('hey')) {
-      const greetings = [
-        `Hello! How are you doing today?`,
-        `Hi there! What's up?`,
-        `Hey! Nice to chat with you!`
-      ];
-      response = greetings[Math.floor(Math.random() * greetings.length)];
+  const handleKeyPress = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => { // Wrap in useCallback
+    if (event.key === 'Enter') {
+      handleSendMessage();
     }
-    // Check for questions about tamagotchi
-    else if (lowerInput.includes('how are you') || lowerInput.includes('feeling')) {
-      if (tamagotchi.stats.happiness > 80) {
-        response = `I'm feeling great! My happiness is at ${tamagotchi.stats.happiness}%!`;
-      } else if (tamagotchi.stats.happiness > 50) {
-        response = `I'm doing okay. Could use a bit more fun though!`;
-      } else {
-        response = `Not so good... I could really use some attention.`;
-      }
-      
-      // Add details based on other stats
-      if (tamagotchi.stats.hunger < 30) {
-        response += ` I'm really hungry right now.`;
-      }
-      if (tamagotchi.stats.thirst < 30) {
-        response += ` I could use something to drink.`;
-      }
-      if (tamagotchi.status.isSick) {
-        response += ` And I'm not feeling well - I think I'm sick.`;
-      }
-    }
-    // Check for questions about evolution
-    else if (lowerInput.includes('evolution') || lowerInput.includes('evolve')) {
-      response = `I'm currently a ${tamagotchi.evolutionType} at evolution stage ${tamagotchi.evolution.stage}. My evolution progress is at ${tamagotchi.evolution.currentProgress}%. The better you take care of me, the faster I'll evolve!`;
-    }
-    // Check for questions about breeding
-    else if (lowerInput.includes('breed') || lowerInput.includes('mate')) {
-      if (tamagotchi.age >= 15 && tamagotchi.stats.health >= 70 && tamagotchi.evolution.stage >= 2) {
-        response = `I'm eligible for breeding! You can visit the Breeding section to find me a mate.`;
-      } else {
-        response = `I'm not ready for breeding yet. I need to be at least 15 days old, have 70% health, and be at evolution stage 2.`;
-      }
-    }
-    // Check for health advice
-    else if (lowerInput.includes('health') || lowerInput.includes('advice') || lowerInput.includes('tip')) {
-      const healthTips = [
-        "Remember to drink plenty of water throughout the day!",
-        "Try to get at least 30 minutes of exercise daily.",
-        "Don't forget to take short breaks when working at a computer.",
-        "Eating colorful fruits and vegetables helps maintain good health.",
-        "A good night's sleep is essential for both of us!",
-        "Meditation can help reduce stress and improve mental clarity."
-      ];
-      response = `Here's a health tip: ${healthTips[Math.floor(Math.random() * healthTips.length)]}`;
-    }
-    // Check for compliments
-    else if (lowerInput.includes('love you') || lowerInput.includes('great') || lowerInput.includes('awesome') || lowerInput.includes('cool')) {
-      const complimentResponses = [
-        "Aww, thank you! I appreciate that!",
-        "You're the best owner I could ask for!",
-        "That makes me so happy to hear!",
-        "I'm blushing! If I could blush, that is."
-      ];
-      response = complimentResponses[Math.floor(Math.random() * complimentResponses.length)];
-    }
-    // Default responses
-    else {
-      const defaultResponses = [
-        "That's interesting! Tell me more.",
-        "I'm still learning about that topic.",
-        "I'm not sure I understand, but I'm trying!",
-        "Could you explain that differently?",
-        "I wish I knew more about that!"
-      ];
-      response = defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
-    }
-    
-    // Modify response based on personality traits
-    if (personalityTraits.sassiness > 0.7 && Math.random() < 0.3) {
-      const sassyAdditions = [
-        " ...obviously.",
-        " Duh!",
-        " Took you long enough to ask!",
-        " I thought you'd never ask.",
-        " Not that you asked in the best way, but whatever."
-      ];
-      response += sassyAdditions[Math.floor(Math.random() * sassyAdditions.length)];
-    }
-    
-    if (personalityTraits.friendliness > 0.8 && Math.random() < 0.4) {
-      const friendlyAdditions = [
-        " I'm so glad we're friends!",
-        " You're the best!",
-        " I really enjoy our chats.",
-        " Thanks for taking such good care of me!"
-      ];
-      response += friendlyAdditions[Math.floor(Math.random() * friendlyAdditions.length)];
-    }
-    
-    if (personalityTraits.playfulness > 0.7 && Math.random() < 0.3) {
-      const playfulAdditions = [
-        " Wanna play a game after this?",
-        " *does a little dance*",
-        " *bounces excitedly*",
-        " This is fun!"
-      ];
-      response += playfulAdditions[Math.floor(Math.random() * playfulAdditions.length)];
-    }
-    
-    // Add tamagotchi message
-    const tamagotchiMessage = {
-      role: 'tamagotchi' as const,
-      content: response,
-      timestamp: new Date()
-    };
-    
-    setMessages(prev => [...prev, tamagotchiMessage]);
-  };
+  }, [handleSendMessage]); // Add dependencies
 
-  const handleImageUpload = () => {
-    // In a real app, this would handle actual image uploads
-    setShowImageUpload(false);
-    
-    // Simulate processing an image
-    setIsProcessing(true);
-    
-    setTimeout(() => {
-      const imageResponses = [
-        "I can see that's a picture of food! Looks delicious, now I'm hungry!",
-        "Is that a park? I love the outdoors! Taking me for a walk would be great for both of us.",
-        "That looks like exercise equipment! Regular workouts are great for maintaining health.",
-        "Is that your pet? They look friendly! I wish I could play with them.",
-        "Nice selfie! You're looking great today!"
-      ];
-      
-      const tamagotchiMessage = {
-        role: 'tamagotchi' as const,
-        content: imageResponses[Math.floor(Math.random() * imageResponses.length)],
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, tamagotchiMessage]);
-      setIsProcessing(false);
-    }, 2000);
-  };
 
-  const toggleVoiceInput = () => {
-    // In a real app, this would use the Web Speech API
-    setIsListening(!isListening);
-    
-    if (!isListening) {
-      // Simulate voice recognition
-      setTimeout(() => {
-        const voiceTexts = [
-          "How are you feeling today?",
-          "What should I eat for dinner?",
-          "Can you recommend an exercise routine?",
-          "Tell me about your evolution"
-        ];
-        
-        setInputMessage(voiceTexts[Math.floor(Math.random() * voiceTexts.length)]);
-        setIsListening(false);
-      }, 3000);
-    }
-  };
+  const handleImageUpload = useCallback(() => { // Wrap in useCallback
+     setShowImageUpload(false); setIsProcessing(true);
+     setTimeout(() => { const responses = ["Nice pic!", "What's that?", "Cool!", "Interesting image."]; const msg = { role: 'tamagotchi' as const, content: responses[Math.floor(Math.random()*responses.length)], timestamp: new Date() }; setMessages(p=>[...p, msg]); setIsProcessing(false); }, 1500);
+  }, []); // No external dependencies
 
-  if (!tamagotchi) {
-    return null;
-  }
+  const toggleVoiceInput = useCallback(() => { // Wrap in useCallback
+     setIsListening(prev => {
+         const nextIsListening = !prev;
+         if (nextIsListening) {
+             // Simulate voice recognition starting
+             setTimeout(() => {
+                 const texts = ["How are you?", "Tell me a joke.", "What's my health?"];
+                 setInputMessage(texts[Math.floor(Math.random()*texts.length)]);
+                 setIsListening(false); // Simulate recognition ending
+             }, 2000);
+         }
+         // else: Handle cancellation if needed
+         return nextIsListening;
+     });
+  }, []); // No external dependencies
+
+
+  if (!tamagotchi) { return <div className="p-4 bg-gray-100 rounded-lg shadow text-center text-gray-500">Loading AI Companion...</div>; }
+
+  // Helper to render personality traits safely
+  const renderTrait = (trait: keyof Personality, label: string, colorClass: string) => (
+    <div>
+      <div className="flex justify-between text-sm font-medium text-gray-700">
+         <Label className="capitalize">{label}:</Label>
+         <span>{Math.round((personalityTraits[trait] || 0) * 100)}%</span>
+      </div>
+       <TooltipProvider delayDuration={100}>
+         <Tooltip>
+           <TooltipTrigger asChild>
+              {/* Removed indicatorClassName, styling via className or default */}
+              <Progress value={(personalityTraits[trait] || 0) * 100} className={`h-2 ${colorClass.replace('bg-', ' [&>*]:bg-')}`} />
+           </TooltipTrigger>
+           <TooltipContent><p>{label}: Detailed description here...</p></TooltipContent>
+         </Tooltip>
+       </TooltipProvider>
+    </div>
+  );
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-bold mb-4">Chat with {tamagotchi.name}</h2>
-      
-      {/* Personality Display */}
-      <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-        <h3 className="font-semibold mb-2">Personality Traits</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>Friendliness:</span>
-              <span>{Math.round(personalityTraits.friendliness * 100)}%</span>
-            </div>
-            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-green-500" 
-                style={{ width: `${personalityTraits.friendliness * 100}%` }}
-              ></div>
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>Playfulness:</span>
-              <span>{Math.round(personalityTraits.playfulness * 100)}%</span>
-            </div>
-            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-yellow-500" 
-                style={{ width: `${personalityTraits.playfulness * 100}%` }}
-              ></div>
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>Intelligence:</span>
-              <span>{Math.round(personalityTraits.intelligence * 100)}%</span>
-            </div>
-            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-blue-500" 
-                style={{ width: `${personalityTraits.intelligence * 100}%` }}
-              ></div>
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>Sassiness:</span>
-              <span>{Math.round(personalityTraits.sassiness * 100)}%</span>
-            </div>
-            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-purple-500" 
-                style={{ width: `${personalityTraits.sassiness * 100}%` }}
-              ></div>
-            </div>
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader className="text-center">
+        <CardTitle className="text-lg">AI Companion: {tamagotchi.name}</CardTitle>
+        <CardDescription className="text-sm">Personality & Mood</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+         {/* Personality Display */}
+        <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-gray-200">
+          <h3 className="font-semibold mb-2 text-center text-sm text-gray-600 uppercase tracking-wider">Personality Profile</h3>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+             {renderTrait('friendliness', 'Friendliness', 'bg-green-500')}
+             {renderTrait('playfulness', 'Playfulness', 'bg-yellow-500')}
+             {renderTrait('intelligence', 'Intelligence', 'bg-blue-500')}
+             {renderTrait('sassiness', 'Sassiness', 'bg-purple-500')}
           </div>
         </div>
-      </div>
-      
-      {/* Chat Messages */}
-      <div className="bg-gray-50 rounded-lg p-4 h-80 overflow-y-auto mb-4">
-        {messages.map((message, index) => (
-          <div 
-            key={index} 
-            className={`mb-3 ${message.role === 'user' ? 'text-right' : ''}`}
-          >
-            <div 
-              className={`inline-block max-w-3/4 rounded-lg p-3 ${
-                message.role === 'user' 
-                  ? 'bg-blue-100 text-blue-800' 
-                  : 'bg-green-100 text-green-800'
-              }`}
-            >
-              <p>{message.content}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {message.timestamp.toLocaleTimeString()}
-              </p>
-            </div>
-          </div>
-        ))}
-        {isProcessing && (
-          <div className="mb-3">
-            <div className="inline-block bg-green-100 text-green-800 rounded-lg p-3">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+
+         {/* Chat Messages */}
+         <div className="bg-gray-100 rounded-lg p-3 h-64 overflow-y-auto border border-gray-200">
+            {messages.map((message, index) => (
+              <div key={index} className={`mb-2 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`inline-block max-w-[80%] rounded-lg px-3 py-2 text-sm ${ message.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none' }`}>
+                  <p>{message.content}</p>
+                   <p className={`text-xs mt-1 ${message.role === 'user' ? 'text-blue-200' : 'text-gray-400'}`}> {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} </p>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Image Upload UI */}
-      {showImageUpload && (
-        <div className="mb-4 p-4 border-2 border-dashed border-gray-300 rounded-lg text-center">
-          <p className="mb-2">Upload an image to share with {tamagotchi.name}</p>
-          <button 
-            onClick={handleImageUpload}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-          >
-            Select Image
-          </button>
-          <button 
-            onClick={() => setShowImageUpload(false)}
-            className="ml-2 text-gray-500 hover:text-gray-700"
-          >
-            Cancel
-          </button>
+            ))}
+            {isProcessing && ( <div className="flex justify-start mb-2"><div className="inline-block bg-white text-gray-800 rounded-lg p-3 border border-gray-200"><div className="flex space-x-1 items-center"><div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></div><div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div><div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div></div></div></div> )}
+         </div>
+
+        {/* Image Upload UI */}
+         {showImageUpload && (<div className="my-2 p-4 border-2 border-dashed border-gray-300 rounded-lg text-center"><p className="mb-2 text-sm">Upload an image (feature simulated)</p><Button onClick={handleImageUpload} size="sm">Select</Button><Button variant="ghost" size="sm" onClick={() => setShowImageUpload(false)} className="ml-2 text-xs">Cancel</Button></div>)}
+
+         {/* Input Area */}
+        <div className="flex items-center space-x-2">
+          <TooltipProvider><Tooltip><TooltipTrigger asChild><Button onClick={() => setShowImageUpload(true)} variant="outline" size="icon" className="w-9 h-9 flex-shrink-0"><Camera className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>Share Image (Simulated)</p></TooltipContent></Tooltip></TooltipProvider>
+          <TooltipProvider><Tooltip><TooltipTrigger asChild><Button onClick={toggleVoiceInput} variant="outline" size="icon" className={`w-9 h-9 flex-shrink-0 ${isListening ? 'text-red-600 animate-pulse' : ''}`}><Mic className="h-4 w-4"/></Button></TooltipTrigger><TooltipContent><p>{isListening ? 'Listening... (Simulated)' : 'Voice Input (Simulated)'}</p></TooltipContent></Tooltip></TooltipProvider>
+          <Input
+            type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder={`Message ${tamagotchi.name}...`}
+            className="flex-1 h-9" // Adjusted height
+            disabled={isProcessing || isListening} />
+           <Button onClick={handleSendMessage} disabled={!inputMessage.trim() || isProcessing} size="icon" className="w-9 h-9 flex-shrink-0"> {/* Adjusted size */}
+             <SendHorizontal className="h-4 w-4"/>
+           </Button>
         </div>
-      )}
-      
-      {/* Input Area */}
-      <div className="flex items-center">
-        <button 
-          onClick={() => setShowImageUpload(true)}
-          className="bg-purple-100 hover:bg-purple-200 text-purple-800 p-2 rounded-full mr-2"
-          title="Share an image"
-        >
-          📷
-        </button>
-        <button 
-          onClick={toggleVoiceInput}
-          className={`${
-            isListening ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
-          } hover:bg-opacity-80 p-2 rounded-full mr-2`}
-          title="Voice input"
-        >
-          🎤
-        </button>
-        <input
-          type="text"
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-          placeholder={`Message ${tamagotchi.name}...`}
-          className="flex-1 border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-          disabled={isProcessing || isListening}
-        />
-        <button 
-          onClick={handleSendMessage}
-          disabled={!inputMessage.trim() || isProcessing}
-          className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full ml-2 disabled:opacity-50"
-        >
-          ➤
-        </button>
-      </div>
-      
-      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-        <h3 className="font-semibold mb-1">AI Interaction Features</h3>
-        <p className="text-sm">
-          Your Tamagotchi's personality evolves based on how you care for it and interact with it.
-          You can chat, share images, and use voice commands to communicate with your pet.
-          The more you interact, the more its unique personality will develop!
-        </p>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
