@@ -10,7 +10,6 @@ export interface TamagotchiStats {
   energy: number;
   health: number;
   cleanliness: number;
-  // weight?: number; // Weight seems to be missing based on previous errors
 }
 
 // Define the structure for Tamagotchi status
@@ -27,24 +26,26 @@ export interface Tamagotchi {
   age: number;
   stats: TamagotchiStats;
   status: TamagotchiStatus;
-  evolutionStage: string; // This seems to be the main stage indicator
+  evolutionStage: string; // Main stage string like 'egg', 'baby', 'child'
   appearance?: {
     imageUrl?: string;
   };
-  dna?: {
-    traits?: {
+  dna?: {             // Optional property
+    traits?: {        // Optional property
       intelligence?: number;
+      strength?: number;     // <<< Added trait
+      agility?: number;      // <<< Added trait
     };
+    rarity?: number;         // <<< Added property (e.g., 1-10)
   };
-  evolution?: {             // <<< Added optional evolution property
-     stage?: number | string; // <<< Added optional stage property (can be number or string)
-     // path?: string;      // Example: Add other relevant evolution details if needed
+  evolution?: {             // Optional property
+     stage?: number | string; // Optional property (e.g., number 1, 2, 3 or string 'egg')
+     currentProgress?: number;
   };
-  lastUpdated: number; // Timestamp of the last update
+  lastUpdated: number;
 }
 
 // Define the shape of the context data and functions
-// Ensure this type includes everything provided by the context value below
 export interface TamagotchiContextType {
   tamagotchi: Tamagotchi | null;
   loading: boolean;
@@ -54,37 +55,33 @@ export interface TamagotchiContextType {
   toggleSleep: () => void;
   cleanTamagotchi: () => void;
   treatTamagotchi: (treatmentType: string) => void;
-  // updateTamagotchiBasedOnActivity?: (activity: string, duration: number) => void; // This function seems missing from implementation
   saveTamagotchi: () => void;
+  // NOTE: updateTamagotchiBasedOnActivity and updateTamagotchiStat seem missing from implementation
 }
 
-// Create the context with a default value
 const TamagotchiContext = createContext<TamagotchiContextType | undefined>(undefined);
 
-// Define the Provider component props
 interface TamagotchiProviderProps {
   children: ReactNode;
 }
 
-// Initial state function (can load from localStorage or API later)
 const getInitialTamagotchi = (): Tamagotchi | null => {
-  // In a real app, load from localStorage or fetch from API
-  // For now, provide a default starting state if nothing is loaded
   const defaultStats: TamagotchiStats = { hunger: 70, thirst: 70, happiness: 60, energy: 80, health: 90, cleanliness: 80 };
   const defaultStatus: TamagotchiStatus = { isSleeping: false, isSick: false, poopCount: 0 };
-  const defaultDna = { traits: { intelligence: 5 } }; // Example intelligence trait value
-  const defaultEvolution = { stage: 1 }; // Example initial evolution stage number
+  // Add placeholder DNA including new traits and rarity
+  const defaultDna = { traits: { intelligence: 5, strength: 5, agility: 5 }, rarity: 3 };
+  const defaultEvolution = { stage: 0, currentProgress: 0  }; // Start at stage 0 (egg)
 
   return {
-    id: 'my-tamagotchi-1', // Example ID
+    id: 'my-tamagotchi-1',
     name: 'Tamatest',
     age: 0,
     stats: defaultStats,
     status: defaultStatus,
-    dna: defaultDna,
-    evolutionStage: 'egg', // Main stage string
-    evolution: defaultEvolution, // Detailed evolution object
-    appearance: { imageUrl: '/tamagotchi-egg.png' }, // Default appearance
+    dna: defaultDna, // Include initial DNA
+    evolutionStage: 'egg', // Initial stage name
+    evolution: defaultEvolution, // Include initial evolution details
+    appearance: { imageUrl: '/tamagotchi-egg.png' },
     lastUpdated: Date.now()
   };
 };
@@ -93,29 +90,33 @@ export const TamagotchiProvider: React.FC<TamagotchiProviderProps> = ({ children
   const [tamagotchi, setTamagotchi] = useState<Tamagotchi | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load initial state (client-side only for localStorage)
-  useEffect(() => {
-      if (typeof window !== 'undefined') {
-          const savedState = localStorage.getItem('tamagotchiState');
-          if (savedState) {
-              try {
-                  const parsedState = JSON.parse(savedState);
-                  // Add validation here if needed before setting state
-                  setTamagotchi(parsedState);
-              } catch (e) {
-                  console.error("Failed to load state from localStorage", e);
-                  setTamagotchi(getInitialTamagotchi()); // Fallback to initial
-              }
-          } else {
-               setTamagotchi(getInitialTamagotchi()); // Set initial if nothing saved
-          }
-          setLoading(false);
-      }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array means this runs once on mount
+   // Load state from localStorage on initial mount (client-side only)
+   useEffect(() => {
+       if (typeof window !== 'undefined') {
+           const savedState = localStorage.getItem('tamagotchiState');
+           if (savedState) {
+               try {
+                   const parsedState = JSON.parse(savedState);
+                   // Basic validation: check if it has an ID
+                   if (parsedState && parsedState.id) {
+                      setTamagotchi(parsedState);
+                   } else {
+                      setTamagotchi(getInitialTamagotchi());
+                   }
+               } catch (e) {
+                   console.error("Failed to load state from localStorage", e);
+                   setTamagotchi(getInitialTamagotchi()); // Fallback to initial
+               }
+           } else {
+                setTamagotchi(getInitialTamagotchi()); // Set initial if nothing saved
+           }
+           setLoading(false);
+       }
+   }, []); // Empty dependency array means this runs once on mount
 
 
-  // Function to update stats, ensuring they stay within bounds (0-100)
+  // --- Action Functions (with safety checks) ---
+
   const updateStat = useCallback((stat: keyof TamagotchiStats, change: number) => {
     setTamagotchi(prev => {
       if (!prev) return null;
@@ -129,7 +130,6 @@ export const TamagotchiProvider: React.FC<TamagotchiProviderProps> = ({ children
     });
   }, []);
 
-   // Function to update status
    const updateStatus = useCallback((key: keyof TamagotchiStatus, value: any) => {
     setTamagotchi(prev => {
       if (!prev) return null;
@@ -141,8 +141,6 @@ export const TamagotchiProvider: React.FC<TamagotchiProviderProps> = ({ children
     });
   }, []);
 
-
-  // Define actions
   const feedTamagotchi = () => updateStat('hunger', 20);
   const giveWater = () => updateStat('thirst', 20);
   const playWithTamagotchi = () => updateStat('happiness', 15);
@@ -176,8 +174,14 @@ export const TamagotchiProvider: React.FC<TamagotchiProviderProps> = ({ children
     }
   };
 
+   const saveTamagotchi = () => {
+      if (tamagotchi && typeof window !== 'undefined') {
+         console.log("Saving Tamagotchi state:", tamagotchi);
+         localStorage.setItem('tamagotchiState', JSON.stringify(tamagotchi));
+      }
+   };
 
-  // Game loop effect for stat decay, aging, etc.
+  // --- Game Loop ---
   useEffect(() => {
     if (!tamagotchi || tamagotchi.status?.isSleeping || loading) return;
 
@@ -186,14 +190,18 @@ export const TamagotchiProvider: React.FC<TamagotchiProviderProps> = ({ children
         if (!prev || prev.status?.isSleeping) return prev;
 
         const now = Date.now();
-        const elapsedMs = Math.min(now - prev.lastUpdated, 2 * 60 * 1000);
+        const elapsedMs = Math.min(now - prev.lastUpdated, 5 * 60 * 1000); // Cap elapsed time (e.g., 5 mins)
         const elapsedHours = elapsedMs / (1000 * 60 * 60);
 
         if (elapsedHours <= 0) return prev;
 
         const prevStats = prev.stats ?? { hunger: 50, thirst: 50, happiness: 50, energy: 50, health: 100, cleanliness: 50 };
         const prevStatus = prev.status ?? { isSleeping: false, isSick: false, poopCount: 0 };
+        const prevEvolution = prev.evolution ?? { stage: 0 };
+        const prevAge = typeof prev.age === 'number' ? prev.age : 0;
 
+
+        // Decay stats
         const hungerDecay = 1 * elapsedHours;
         const thirstDecay = 1.5 * elapsedHours;
         const happinessDecay = 0.5 * elapsedHours;
@@ -212,32 +220,32 @@ export const TamagotchiProvider: React.FC<TamagotchiProviderProps> = ({ children
           cleanliness: Math.max(0, prevStats.cleanliness - cleanlinessDecay),
         };
 
+         // Handle poop
          let newPoopCount = prevStatus.poopCount;
          if (Math.random() < 0.05 * elapsedHours && newPoopCount < 3) {
             newPoopCount += 1;
          }
 
+         // Handle sickness
          let newIsSick = prevStatus.isSick;
          if (!newIsSick && (prevStats.cleanliness < 25 || prevStats.health < 40)) {
-             if (Math.random() < 0.02 * elapsedHours) {
-                 newIsSick = true;
-             }
+             if (Math.random() < 0.02 * elapsedHours) newIsSick = true;
          }
 
-        const currentAge = typeof prev.age === 'number' ? prev.age : 0;
-        const newAge = currentAge + (elapsedHours / 24);
+        // Handle age
+        const newAge = prevAge + (elapsedHours / 24); // Age in days
 
-        // Add basic evolution logic example (could be more complex)
+        // Handle evolution (simplified example)
         let newEvolutionStage = prev.evolutionStage;
-        let newEvolution = prev.evolution;
-        if (newAge > 5 && prev.evolutionStage === 'egg') { // Example: Evolve from egg after 5 'days'
-            newEvolutionStage = 'baby';
-            newEvolution = { ...newEvolution, stage: 1 }; // Update detailed stage if needed
-        } else if (newAge > 15 && prev.evolutionStage === 'baby') { // Example: Evolve from baby
-             newEvolutionStage = 'child';
-             newEvolution = { ...newEvolution, stage: 2 };
-        } // Add more stages...
+        let newEvolutionDetails = prevEvolution;
 
+        if (newAge > 1 && prev.evolutionStage === 'egg') { // Example: Egg hatches after 1 day
+            newEvolutionStage = 'baby';
+            newEvolutionDetails = { ...newEvolutionDetails, stage: 1 };
+        } else if (newAge > 3 && prev.evolutionStage === 'baby') { // Example: Evolves to child after 3 days
+             newEvolutionStage = 'child';
+             newEvolutionDetails = { ...newEvolutionDetails, stage: 2 };
+        } // Add more stages...
 
         return {
           ...prev,
@@ -245,28 +253,16 @@ export const TamagotchiProvider: React.FC<TamagotchiProviderProps> = ({ children
           status: { ...prevStatus, poopCount: newPoopCount, isSick: newIsSick },
           lastUpdated: now,
           age: newAge,
-          evolutionStage: newEvolutionStage, // Update main stage string
-          evolution: newEvolution // Update detailed evolution object
+          evolutionStage: newEvolutionStage,
+          evolution: newEvolutionDetails
         };
       });
-    }, 60 * 1000);
+    }, 60 * 1000); // Update every minute
 
     return () => clearInterval(interval);
   }, [tamagotchi, loading]);
 
 
-   // Save function (example - could save to localStorage or API)
-   const saveTamagotchi = () => {
-      if (tamagotchi) {
-         console.log("Saving Tamagotchi state:", tamagotchi);
-         if (typeof window !== 'undefined') {
-            localStorage.setItem('tamagotchiState', JSON.stringify(tamagotchi));
-         }
-      }
-   };
-
-
-  // Provide context value
   const contextValue: TamagotchiContextType = {
     tamagotchi,
     loading,
@@ -286,7 +282,6 @@ export const TamagotchiProvider: React.FC<TamagotchiProviderProps> = ({ children
   );
 };
 
-// Custom hook to use the Tamagotchi context
 export const useTamagotchi = (): TamagotchiContextType => {
   const context = useContext(TamagotchiContext);
   if (context === undefined) {
